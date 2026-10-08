@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>FiveM Banka Fatura NUI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none; 
+            overflow: hidden;
+            background: transparent !important;
+        }
+
+        #bank-wrapper { 
+            display: none; 
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+
+        /* Tab Content Animations */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fleeca: '#10b981',   // Emerald Green
+                        maze: '#dc2626',     // Red
+                        pacific: '#1d4ed8'   // Blue
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="economy.css">
+    <script src="i18n.js"></script>
+</head>
+<body class="h-screen w-screen flex items-center justify-center bg-transparent">
+
+    <div class="hidden bg-fleeca bg-maze bg-pacific text-fleeca text-maze text-pacific border-fleeca border-maze border-pacific from-fleeca/20 from-maze/20 from-pacific/20 bg-fleeca/20 bg-maze/20 bg-pacific/20"></div>
+
+    <div id="bank-wrapper" class="w-full max-w-5xl h-[680px] bg-slate-900/95 rounded-2xl border border-slate-700/50 flex flex-col transition-all duration-300">
+        
+        <!-- Üst Header -->
+        <header id="bank-header" class="h-20 border-b border-slate-700/50 flex items-center justify-between px-8 bg-gradient-to-r from-fleeca/20 to-transparent transition-colors duration-500">
+            <div class="flex items-center gap-4">
+                <div id="bank-icon-bg" class="w-12 h-12 rounded-xl bg-fleeca flex items-center justify-center shadow-lg transition-colors duration-500">
+                    <i id="bank-icon" class="fa-solid fa-building-columns text-2xl text-white"></i>
+                </div>
+                <div>
+                    <h1 id="bank-name" class="text-2xl font-bold text-white tracking-wide">FLEECA BANK</h1>
+                    <p class="text-slate-400 text-sm">Güvenli Bankacılık</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p class="text-slate-300 font-medium">Hoşgeldin, <span id="player-name" class="text-white">Oyuncu</span></p>
+                    <p class="text-slate-500 text-xs">Hesap: <span id="player-cid">#---</span></p>
+                </div>
+                <button onclick="closeUI()" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 transition-colors flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- İçerik -->
+        <main class="flex-1 p-8 grid grid-cols-12 gap-8 h-full overflow-hidden">
+            
+            <!-- Sol Panel -->
+            <div id="left-panel" class="col-span-4 flex flex-col gap-6">
+                <!-- Bakiye -->
+                <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 relative overflow-hidden">
+                    <div id="card-glow" class="absolute top-0 right-0 w-32 h-32 bg-fleeca/20 blur-3xl rounded-full transition-colors duration-500"></div>
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-slate-400 text-sm">Mevcut Bakiye</p>
+                        <select id="account-switcher" onchange="switchAccount()" class="bg-slate-900/80 text-white text-xs border border-slate-600 rounded-lg px-2 py-1 outline-none relative z-10 cursor-pointer hover:border-slate-400 transition-colors">
+                        </select>
+                    </div>
+                    <h2 class="text-4xl font-bold text-white tracking-tight mb-4">$<span id="current-balance">0.00</span></h2>
+                    <div class="flex gap-2">
+                        <span class="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg text-xs font-medium"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Aktif</span>
+                    </div>
+                </div>
+
+                <!-- Hızlı İşlemler -->
+                <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 flex-1">
+                    <h3 class="text-white font-medium mb-4 text-sm uppercase tracking-wider text-slate-400">Hızlı İşlemler</h3>
+                    <div class="flex flex-col gap-3">
+                        <button onclick="setAction('deposit')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-arrow-down"></i>
+                                </div>
+                                <span class="text-slate-200 font-medium">Para Yatır</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-white transition-colors"></i>
+                        </button>
+                        <button onclick="setAction('withdraw')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-arrow-up"></i>
+                                </div>
+                                <span class="text-slate-200 font-medium">Para Çek</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-white transition-colors"></i>
+                        </button>
+                        <button onclick="setAction('transfer')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-700/30 hover:bg-slate-700 border border-transparent hover:border-slate-600 transition-all group">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <i class="fa-solid fa-right-left"></i>
+                                </div>
+                                <span class="text-slate-200 font-medium">Transfer Yap</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-white transition-colors"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Panel -->
+            <div id="right-panel" class="col-span-8 flex flex-col h-full">
+                
+                <!-- Sekme Menüsü -->
+                <div class="flex gap-4 mb-6 border-b border-slate-700/50 pb-2">
+                    <button onclick="switchTab('overview')" id="tab-btn-overview" class="px-4 py-2 text-white font-medium border-b-2 border-transparent transition-all tab-btn active-tab border-fleeca">İşlem Ekranı</button>
+                    <button onclick="switchTab('invoices')" id="tab-btn-invoices" class="px-4 py-2 text-slate-400 hover:text-white font-medium border-b-2 border-transparent transition-all tab-btn relative">
+                        Faturalarım
+                        <span id="invoice-count" class="hidden absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg">0</span>
+                    </button>
+                </div>
+
+                <!-- Genel Bakış -->
+                <div id="tab-overview" class="tab-content active flex-col gap-6 h-full">
+                    <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 shrink-0">
+                        <div class="flex items-center gap-4 mb-4 w-full">
+                            <div class="flex-1 min-w-0">
+                                <label class="block text-slate-400 text-xs uppercase tracking-wider mb-2 truncate">Miktar ($)</label>
+                                <input id="action-amount" type="number" placeholder="0.00" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-slate-400 transition-colors">
+                            </div>
+                            <div class="flex-1 min-w-0" id="transfer-id-div" style="display: none;">
+                                <label class="block text-slate-400 text-xs uppercase tracking-wider mb-2 truncate">ID</label>
+                                <input id="action-target" type="text" placeholder="ID..." class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-slate-400 transition-colors">
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <label class="block text-slate-400 text-xs uppercase tracking-wider mb-2 truncate">Açıklama</label>
+                                <input id="action-comment" type="text" placeholder="Detay..." class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-slate-400 transition-colors">
+                            </div>
+                        </div>
+                        <button id="submit-action-btn" onclick="submitAction()" class="w-full py-3 rounded-xl bg-green-500 hover:opacity-90 text-white font-semibold transition-all duration-300 shadow-lg flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> <span id="action-btn-text">Para Yatır</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-800/50 rounded-2xl border border-slate-700/50 flex-1 flex flex-col min-h-[150px]">
+                        <div class="p-4 border-b border-slate-700/50 bg-slate-800/80">
+                            <h3 class="text-white font-medium text-sm uppercase tracking-wider text-slate-400">Son İşlemler</h3>
+                        </div>
+                        <div id="transactions-list" class="p-4 flex-1 overflow-y-auto flex flex-col gap-2">
+                            <!-- Transactions populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Faturalarım -->
+                <div id="tab-invoices" class="tab-content flex-col gap-4 h-full">
+                    
+                    <div class="bg-slate-800/50 rounded-2xl border border-slate-700/50 flex-1 flex flex-col h-full">
+                        <div class="p-5 border-b border-slate-700/50 bg-slate-800/80 flex justify-between items-center">
+                            <div>
+                                <h3 class="text-white font-medium text-sm uppercase tracking-wider text-slate-400">Ödenmemiş Faturalar</h3>
+                                <p class="text-slate-500 text-xs mt-1">Ödemelerinizden banka tarafından %5 vergi kesilmektedir.</p>
+                            </div>
+                        </div>
+                        
+                        <div id="invoices-list" class="p-4 flex-1 overflow-y-auto flex flex-col gap-3">
+                            <!-- Invoices populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        window.currentTheme = 'fleeca';
+        let currentAction = 'deposit';
+        let currentAccountId = null;
+
+        function setAction(action) {
+            currentAction = action;
+            document.getElementById('transfer-id-div').style.display = action === 'transfer' ? 'block' : 'none';
+            let texts = {
+                'deposit': 'Para Yatır',
+                'withdraw': 'Para Çek',
+                'transfer': 'Transfer Yap'
+            };
+            document.getElementById('action-btn-text').innerText = texts[action];
+            
+            let btn = document.getElementById('submit-action-btn');
+            // Remove previous color classes
+            btn.classList.remove('bg-fleeca', 'bg-maze', 'bg-pacific', 'bg-green-500', 'bg-red-500', 'bg-blue-500');
+            
+            if(action === 'deposit') {
+                btn.classList.add('bg-green-500');
+            } else if(action === 'withdraw') {
+                btn.classList.add('bg-red-500');
+            } else if(action === 'transfer') {
+                btn.classList.add('bg-blue-500');
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-white', 'border-fleeca', 'border-maze', 'border-pacific');
+                btn.classList.add('text-slate-400', 'border-transparent');
+                if (btn.id === 'tab-btn-' + tabId) {
+                    btn.classList.remove('text-slate-400', 'border-transparent');
+                    btn.classList.add('text-white', `border-${window.currentTheme}`);
+                }
+            });
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if (tabId === 'invoices') {
+                fetchInvoices();
+            }
+        }
+
+        function closeUI() {
+            document.getElementById('bank-wrapper').style.display = 'none';
+            fetch(`https://${GetParentResourceName()}/closeInterface`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        }
+
+        document.onkeyup = function(data) {
+            if (data.key == "Escape") {
+                closeUI();
+            }
+        };
+
+        function setBankTheme(type) {
+            type = type || 'fleeca';
+            window.currentTheme = type;
+            const header = document.getElementById('bank-header');
+            const iconBg = document.getElementById('bank-icon-bg');
+            const icon = document.getElementById('bank-icon');
+            const name = document.getElementById('bank-name');
+            const glow = document.getElementById('card-glow');
+
+            document.querySelectorAll('.dynamic-bg').forEach(el => {
+                el.classList.remove('bg-fleeca', 'bg-maze', 'bg-pacific');
+                el.classList.add(`bg-${type}`);
+            });
+            
+            document.querySelectorAll('.dynamic-text').forEach(el => {
+                el.classList.remove('text-fleeca', 'text-maze', 'text-pacific');
+                el.classList.add(`text-${type}`);
+            });
+
+            const activeTabBtn = document.querySelector('.tab-btn.text-white');
+            if (activeTabBtn) {
+                activeTabBtn.classList.remove('border-fleeca', 'border-maze', 'border-pacific');
+                activeTabBtn.classList.add(`border-${type}`);
+            }
+
+            if (type === 'fleeca') {
+                name.innerText = "FLEECA BANK";
+                icon.className = "fa-solid fa-leaf text-2xl text-white";
+            } else if (type === 'maze') {
+                name.innerText = "MAZE BANK";
+                icon.className = "fa-solid fa-building text-2xl text-white";
+            } else if (type === 'pacific') {
+                name.innerText = "PACIFIC STANDARD";
+                icon.className = "fa-solid fa-vault text-2xl text-white";
+            }
+        }
+
+        window.addEventListener('message', function(event) {
+            let data = event.data;
+            if (data.action === "setVisible" && data.status) {
+                document.getElementById('bank-wrapper').style.display = 'flex';
+                
+                setBankTheme('fleeca'); 
+                
+                // Restore wrapper size if it was changed by economy
+                let wrapper = document.getElementById('bank-wrapper');
+                wrapper.classList.remove('max-w-[90vw]', 'h-[90vh]');
+                wrapper.classList.add('max-w-5xl', 'h-[680px]');
+
+                // Restore layout if it was changed by economy
+                let leftPanel = document.getElementById('left-panel');
+                let rightPanel = document.getElementById('right-panel');
+                
+                if (data.viewOnly) {
+                    // Faturalarım mode: hide left panel, full width right
+                    if(leftPanel) leftPanel.style.display = 'none';
+                    if(rightPanel) {
+                        rightPanel.classList.remove('col-span-8');
+                        rightPanel.classList.add('col-span-12');
+                    }
+                } else {
+                    // Normal bank mode: show left panel
+                    if(leftPanel) leftPanel.style.display = 'flex';
+                    if(rightPanel) {
+                        rightPanel.classList.remove('col-span-12');
+                        rightPanel.classList.add('col-span-8');
+                    }
+                }
+                
+                // Hide tabs for specific views
+                document.getElementById('tab-btn-overview').style.display = data.viewOnly ? 'none' : 'block';
+                document.getElementById('tab-btn-invoices').style.display = 'block';
+                let ecoBtn = document.getElementById('tab-btn-economy');
+                if(ecoBtn) ecoBtn.style.display = 'none';
+                
+                // Set global flag to disable payments when viewing from anywhere
+                window.canPay = data.canPay !== false;
+                
+                if (data.accounts && data.accounts.length > 0) {
+                    window.playerAccounts = data.accounts;
+                    const switcher = document.getElementById('account-switcher');
+                    switcher.innerHTML = '';
+                    
+                    data.accounts.forEach(acc => {
+                        let opt = document.createElement('option');
+                        opt.value = acc.id;
+                        opt.innerText = acc.name || acc.id;
+                        switcher.appendChild(opt);
+                    });
+
+                    let personal = data.accounts.find(x => x.type === 'Personal' || x.type === 'Kişisel' || x.id.includes('TR') || x.id.length > 3);
+                    if (!personal) personal = data.accounts[0];
+                    switcher.value = personal.id;
+                    
+                    applyAccountView(personal.id);
+                }
+
+                if (data.openInvoices) {
+                    switchTab('invoices');
+                } else {
+                    switchTab('overview');
+                    fetchInvoices();
+                }
+            }
+            if (data.action === "openEconomy") {
+                document.getElementById('bank-wrapper').style.display = 'flex';
+                setBankTheme('maze');
+                
+                let wrapper = document.getElementById('bank-wrapper');
+                wrapper.classList.remove('max-w-5xl', 'h-[680px]');
+                wrapper.classList.add('max-w-[90vw]', 'h-[90vh]');
+                
+                document.getElementById('player-name').innerText = 'Admin';
+                document.getElementById('player-cid').innerText = 'Sistem';
+                
+                document.getElementById('tab-btn-overview').style.display = 'none';
+                document.getElementById('tab-btn-invoices').style.display = 'none';
+                
+                // Hide left panel and make right panel full width
+                document.getElementById('left-panel').style.display = 'none';
+                document.getElementById('right-panel').classList.remove('col-span-8');
+                document.getElementById('right-panel').classList.add('col-span-12');
+                
+                let ecoBtn = document.getElementById('tab-btn-economy');
+                if(!ecoBtn) {
+                    ecoBtn = document.createElement('button');
+                    ecoBtn.id = 'tab-btn-economy';
+                    ecoBtn.className = 'px-4 py-2 text-white font-medium border-b-2 border-transparent transition-all tab-btn active-tab border-maze';
+                    ecoBtn.innerText = 'Ekonomi & Ayarlar';
+                    document.querySelector('.flex.gap-4.mb-6').appendChild(ecoBtn);
+                    
+                    let ecoTab = document.createElement('div');
+                    ecoTab.id = 'tab-economy';
+                    ecoTab.className = 'tab-content active flex-col gap-6 h-full overflow-y-auto pr-2';
+                    document.getElementById('right-panel').appendChild(ecoTab);
+                }
+                
+                ecoBtn.style.display = 'block';
+                switchTab('economy');
+                
+                // Populate economy tab
+                document.getElementById('tab-economy').innerHTML = `
+                    <div class="flex gap-6 border-b border-slate-700/50 mb-2">
+                        <button onclick="switchAdminTab('stats')" id="admin-tab-btn-stats" class="admin-tab-btn text-white font-medium border-b-2 border-maze px-2 pb-3 transition-all">Genel İstatistikler</button>
+                        <button onclick="switchAdminTab('tax')" id="admin-tab-btn-tax" class="admin-tab-btn text-slate-400 font-medium border-b-2 border-transparent px-2 pb-3 transition-all">Varlık Vergisi</button>
+                        <button onclick="switchAdminTab('jobs')" id="admin-tab-btn-jobs" class="admin-tab-btn text-slate-400 font-medium border-b-2 border-transparent px-2 pb-3 transition-all">Fatura Meslekleri</button>
+                    </div>
+
+                    <!-- TAB: İSTATİSTİKLER -->
+                    <div id="admin-tab-stats" class="grid grid-cols-2 gap-6 pb-6">
+                        <!-- Sol: Sadece İstatistikler -->
+                        <div class="flex flex-col gap-6">
+                            <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 shrink-0">
+                                <h3 class="text-white font-medium mb-4 text-sm uppercase tracking-wider text-slate-400">Sunucu Ekonomi İstatistikleri</h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                        <p class="text-slate-400 text-xs mb-1">Toplam Banka</p>
+                                        <p class="text-2xl text-blue-400 font-bold">$${data.stats.totalBank.toLocaleString('en-US')}</p>
+                                    </div>
+                                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                        <p class="text-slate-400 text-xs mb-1">Toplam Nakit</p>
+                                        <p class="text-2xl text-green-400 font-bold">$${data.stats.totalCash.toLocaleString('en-US')}</p>
+                                    </div>
+                                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                        <p class="text-slate-400 text-xs mb-1">Genel Toplam (Banka + Nakit)</p>
+                                        <p class="text-2xl text-white font-bold">$${(data.stats.totalBank + data.stats.totalCash).toLocaleString('en-US')}</p>
+                                    </div>
+                                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
+                                        <p class="text-slate-400 text-xs mb-1">Sunucu Toplam Araç Sayısı</p>
+                                        <p class="text-2xl text-blue-400 font-bold">${(data.stats.totalVehicles || 0).toLocaleString('en-US')} Araç</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sağ: Oyuncu Listesi -->
+                        <div class="bg-slate-800/50 rounded-2xl border border-slate-700/50 flex flex-col">
+                            <div class="p-4 border-b border-slate-700/50 bg-slate-800/80">
+                                <h3 class="text-white font-medium text-sm uppercase tracking-wider text-slate-400">En Zengin Oyuncular (İlk 100)</h3>
+                            </div>
+                            <div class="p-2" id="players-list-container">
+                                <table class="w-full text-left text-sm text-slate-300">
+                                    <thead class="text-xs uppercase bg-slate-900/50 text-slate-400 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-3 rounded-tl-lg">Oyuncu Adı</th>
+                                            <th class="px-4 py-3">Banka</th>
+                                            <th class="px-4 py-3">Nakit</th>
+                                            <th class="px-4 py-3">Araç</th>
+                                            <th class="px-4 py-3">Ev</th>
+                                            <th class="px-4 py-3 rounded-tr-lg">Toplam</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="players-list-body">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: VERGİ AYARLARI -->
+                    <div id="admin-tab-tax" class="hidden flex-col gap-6 pb-6">
+                        <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                            <h3 class="text-white font-medium mb-2 text-sm uppercase tracking-wider text-slate-400">Varlık Vergisi Ayarları</h3>
+                            <p class="text-slate-500 text-xs mb-4">Belirlenen sürede oyuncuların toplam varlığına göre vergi faturası kesilir.</p>
+                            <div class="flex flex-col gap-4">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <label class="block text-slate-400 text-xs mb-2">Vergi Oranı (%)</label>
+                                        <input id="tax-rate-input" type="number" value="${data.stats.taxConfig.rate}" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2 text-white">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-slate-400 text-xs mb-2">Süre (Saat)</label>
+                                        <input id="tax-interval-input" type="number" value="${data.stats.taxConfig.interval}" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2 text-white">
+                                    </div>
+                                </div>
+                                <button onclick="saveTaxConfig()" class="w-full py-2 bg-maze text-white rounded-xl hover:opacity-90 font-semibold shadow">Kaydet</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: MESLEK AYARLARI -->
+                    <div id="admin-tab-jobs" class="hidden flex-col gap-6 pb-6">
+                        <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50">
+                            <h3 class="text-white font-medium mb-4 text-sm uppercase tracking-wider text-slate-400">Fatura İzni Olan Meslekler</h3>
+                            <div class="flex gap-2 mb-4">
+                                <input id="new-job-input" type="text" placeholder="Meslek adı (örn: police)" class="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-slate-400">
+                                <button onclick="toggleJobInvoice()" class="px-4 py-2 bg-fleeca text-white rounded-xl hover:opacity-90 font-semibold shadow">Ekle / Çıkar</button>
+                            </div>
+                            <div id="allowed-jobs-list" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                `;
+                
+                window.allowedJobs = data.stats.allowedJobs || [];
+                renderAllowedJobs();
+
+                const pBody = document.getElementById('players-list-body');
+                if (data.stats.players && data.stats.players.length > 0) {
+                    data.stats.players.forEach(p => {
+                        pBody.innerHTML += `
+                            <tr class="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
+                                <td class="px-4 py-3 font-medium text-white">${p.name}</td>
+                                <td class="px-4 py-3 text-slate-400">$${p.bank.toLocaleString('en-US')}</td>
+                                <td class="px-4 py-3 text-slate-400">$${p.cash.toLocaleString('en-US')}</td>
+                                <td class="px-4 py-3 text-blue-400 font-medium">${p.vehicles || 0}</td>
+                                <td class="px-4 py-3 text-purple-400 font-medium">${p.houses || 0}</td>
+                                <td class="px-4 py-3 text-green-400 font-semibold">$${p.total.toLocaleString('en-US')}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    pBody.innerHTML = '<tr><td colspan="4" class="px-4 py-3 text-center text-slate-500">Oyuncu bulunamadı</td></tr>';
+                }
+            }
+            if (data.action === "setVisible" && !data.status) {
+                document.getElementById('bank-wrapper').style.display = 'none';
+            }
+        });
+        
+        function applyAccountView(id) {
+            if (!window.playerAccounts) return;
+            const acc = window.playerAccounts.find(x => x.id === id);
+            if (!acc) return;
+            
+            currentAccountId = acc.id;
+            document.getElementById('player-name').innerText = acc.name || 'Bilinmiyor';
+            document.getElementById('player-cid').innerText = acc.id || '#---';
+            document.getElementById('current-balance').innerText = (acc.amount || 0).toLocaleString('en-US');
+            
+            updateTransactions(acc.transactions || []);
+        }
+
+        function switchAccount() {
+            const val = document.getElementById('account-switcher').value;
+            applyAccountView(val);
+        }
+
+        function renderAllowedJobs() {
+            const list = document.getElementById('allowed-jobs-list');
+            if(!list) return;
+            list.innerHTML = '';
+            window.allowedJobs.forEach(job => {
+                list.innerHTML += `<span class="px-3 py-1 bg-slate-700 text-white rounded-full text-sm flex items-center gap-2 border border-slate-600">${job} <i class="fa-solid fa-xmark cursor-pointer hover:text-red-400" onclick="removeJobInvoice('${job}')"></i></span>`;
+            });
+        }
+        
+        function toggleJobInvoice() {
+            let job = document.getElementById('new-job-input').value.trim();
+            if(!job) return;
+            fetch(`https://${GetParentResourceName()}/toggleJobInvoice`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({job: job})
+            }).then(resp => resp.json()).then(res => {
+                if(res.success) {
+                    window.allowedJobs = res.jobs;
+                    renderAllowedJobs();
+                    document.getElementById('new-job-input').value = '';
+                }
+            });
+        }
+        
+        function removeJobInvoice(job) {
+            fetch(`https://${GetParentResourceName()}/toggleJobInvoice`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({job: job})
+            }).then(resp => resp.json()).then(res => {
+                if(res.success) {
+                    window.allowedJobs = res.jobs;
+                    renderAllowedJobs();
+                }
+            });
+        }
+
+        function saveTaxConfig() {
+            let rate = document.getElementById('tax-rate-input').value;
+            let interval = document.getElementById('tax-interval-input').value;
+            fetch(`https://${GetParentResourceName()}/saveTaxConfig`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({rate: rate, interval: interval})
+            }).then(resp => resp.json()).then(res => {
+                if(res) {
+                    console.log("Tax config saved.");
+                }
+            });
+        }
+
+        function updateTransactions(txs) {
+            const list = document.getElementById('transactions-list');
+            list.innerHTML = '';
+            if (!txs || txs.length === 0) {
+                list.innerHTML = '<p class="text-slate-500 text-sm p-2">İşlem geçmişi bulunmuyor.</p>';
+                return;
+            }
+            txs.slice(0, 10).forEach(tx => {
+                let isDeposit = tx.trans_type === 'deposit';
+                let iconClass = isDeposit ? 'fa-arrow-down text-green-400 bg-green-500/10' : 'fa-arrow-up text-red-400 bg-red-500/10';
+                let amountClass = isDeposit ? 'text-green-400' : 'text-slate-300';
+                let sign = isDeposit ? '+' : '-';
+                
+                let dateStr = new Date(tx.time * 1000).toLocaleString((window.I18N && I18N.dateLocale) || 'tr-TR');
+
+                list.innerHTML += `
+                    <div class="flex items-center justify-between p-3 rounded-xl hover:bg-slate-700/30 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-full ${iconClass.split(' ')[2]} ${iconClass.split(' ')[1]} flex items-center justify-center"><i class="fa-solid ${iconClass.split(' ')[0]}"></i></div>
+                            <div>
+                                <p class="text-white font-medium text-sm">${tx.title || tx.message}</p>
+                                <p class="text-slate-500 text-xs">${dateStr}</p>
+                            </div>
+                        </div>
+                        <span class="${amountClass} font-semibold">${sign}$${tx.amount.toLocaleString('en-US')}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function submitAction() {
+            let amount = document.getElementById('action-amount').value;
+            let comment = document.getElementById('action-comment').value;
+            let target = document.getElementById('action-target').value;
+
+            if (!amount || amount <= 0) return;
+
+            let payload = {
+                amount: amount,
+                comment: comment,
+                fromAccount: currentAccountId
+            };
+
+            if (currentAction === 'transfer') {
+                payload.stateid = target;
+            }
+
+            fetch(`https://${GetParentResourceName()}/${currentAction}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(resp => resp.json()).then(res => {
+                if (res) {
+                    // updated accounts data
+                    let personal = res.find(x => x.id === currentAccountId);
+                    if (personal) {
+                        document.getElementById('current-balance').innerText = (personal.amount || 0).toLocaleString('en-US');
+                        updateTransactions(personal.transactions);
+                    }
+                    document.getElementById('action-amount').value = '';
+                    document.getElementById('action-comment').value = '';
+                    document.getElementById('action-target').value = '';
+                }
+            });
+        }
+
+        function fetchInvoices() {
+            fetch(`https://${GetParentResourceName()}/getInvoices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(resp => resp.json()).then(invoices => {
+                const list = document.getElementById('invoices-list');
+                const badge = document.getElementById('invoice-count');
+                list.innerHTML = '';
+                
+                if (!invoices || invoices.length === 0) {
+                    badge.classList.add('hidden');
+                    list.innerHTML = '<p class="text-slate-500 text-sm p-4">Ödenmemiş faturanız bulunmuyor.</p>';
+                    return;
+                }
+                
+                badge.innerText = invoices.length;
+                badge.classList.remove('hidden');
+
+                invoices.forEach(inv => {
+                    list.innerHTML += `
+                        <div class="bg-slate-900/50 border border-slate-700 rounded-xl p-4 flex items-center justify-between hover:border-slate-500 transition-colors group">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-700 group-hover:text-white transition-colors">
+                                    <i class="fa-solid fa-file-invoice-dollar text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-medium">${inv.sender_name}</h4>
+                                    <p class="text-slate-400 text-xs">${inv.reason}</p>
+                                    <p class="text-slate-500 text-[10px] mt-1">Gönderen: #${inv.sender} | Tarih: ${inv.date}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="text-xl font-bold text-white">$${inv.amount.toLocaleString('en-US')}</span>
+                                ${window.canPay ? `<button onclick="payInvoice(${inv.id})" class="dynamic-bg px-6 py-2 bg-${window.currentTheme} text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-all shadow">
+                                    Öde
+                                </button>` : `<span class="text-xs text-red-400 border border-red-400/20 px-2 py-1 rounded bg-red-400/10">Ödemek için bankaya gidin</span>`}
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function payInvoice(id) {
+            fetch(`https://${GetParentResourceName()}/payInvoice`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({id: id})
+            }).then(resp => resp.json()).then(res => {
+                if (res) {
+                    fetchInvoices();
+                }
+            });
+        }
+
+        function switchAdminTab(tabId) {
+            // Reset all buttons
+            document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+                btn.classList.remove('text-white', 'border-maze');
+                btn.classList.add('text-slate-400', 'border-transparent');
+            });
+            // Set active button
+            let activeBtn = document.getElementById('admin-tab-btn-' + tabId);
+            if(activeBtn) {
+                activeBtn.classList.remove('text-slate-400', 'border-transparent');
+                activeBtn.classList.add('text-white', 'border-maze');
+            }
+            
+            // Hide all tabs
+            ['stats', 'tax', 'jobs'].forEach(t => {
+                let tab = document.getElementById('admin-tab-' + t);
+                if (tab) {
+                    if (t === 'stats') {
+                        tab.style.display = 'none'; // Because it's a grid, adding .hidden might conflict or we can just add hidden
+                        tab.classList.add('hidden');
+                    } else {
+                        tab.classList.add('hidden');
+                        tab.classList.remove('flex');
+                    }
+                }
+            });
+            
+            // Show active tab
+            let activeTab = document.getElementById('admin-tab-' + tabId);
+            if(activeTab) {
+                if (tabId === 'stats') {
+                    activeTab.classList.remove('hidden');
+                    activeTab.style.display = 'grid'; // ensure it gets grid back
+                } else {
+                    activeTab.classList.remove('hidden');
+                    activeTab.classList.add('flex');
+                }
+            }
+        }
+    </script>
+    <script src="economy.js"></script>
+    <script src="economy2.js"></script>
+</body>
+</html>
